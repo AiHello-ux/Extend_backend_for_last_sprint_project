@@ -10,6 +10,7 @@ from argon2.exceptions import VerifyMismatchError
 DB_PATH = "Library.db"
 engine = create_engine(f"sqlite:///{DB_PATH}")  
 Base = declarative_base()
+ph = PasswordHasher()
 
 access_token_expire_minutes = 1
 refresh_token_expire = 7 * 24 * 60

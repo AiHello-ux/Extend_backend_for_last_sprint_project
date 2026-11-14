@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 import functions
 from pydantic import BaseModel
@@ -10,7 +10,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://127.0.0.1:5173"],
     allow_methods=["*"],
     allow_headers=["*"]
 )
@@ -20,8 +20,6 @@ class Book(BaseModel):
     author: str
     genre: str
     total_copies: int
-
-# class (BaseModel):
 
 @app.get("/books")
 def get_books(genre: str = None, title: str = None):
@@ -37,7 +35,13 @@ def get_one_book(id: int):
 VALID_GENRES = ["textbook", "fiction", "reference", "magazine", "biography"]
 
 @app.post("/books")
-def add_new_book(book: Book):
+def add_new_book(book: Book, token=Header(None)):
+    payload = functions.verify_token(token=token, token_type="access")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    if payload.get("user_type") != "librarian":
+        raise HTTPException(status_code=403, detail="Librarian access required.")
+
     if book.genre not in VALID_GENRES:
         raise HTTPException(status_code=422, detail="Genre not in the list")
     result = functions.add_new_book(title=book.title, author=book.author, genre=book.genre, total_copies=book.total_copies)
@@ -46,15 +50,33 @@ def add_new_book(book: Book):
     return result
 
 @app.get("/loans/overdue")
-def get_overdue_loans():
+def get_overdue_loans(token=Header(None)):
+    payload = functions.verify_token(token=token, token_type="access")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    if payload.get("user_type") != "librarian":
+        raise HTTPException(status_code=403, detail="Librarian access required.")
+
     return functions.get_overdue_loans()
 
 @app.get("/loans/student/{roll_no}")
-def get_student_loans(roll_no: str):
+def get_student_loans(roll_no: str, token=Header(None)):
+    payload = functions.verify_token(token=token, token_type="access")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    if payload.get("user_type") != "student":
+        raise HTTPException(status_code=403, detail="Student access required.")
+
     return functions.get_student_loans(roll_no)
 
 @app.patch("/loans/{loan_id}/renew")
-def renew_loan(loan_id: int):
+def renew_loan(loan_id: int, token=Header(None)):
+    payload = functions.verify_token(token=token, token_type="access")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    if payload.get("user_type") != "student":
+        raise HTTPException(status_code=403, detail="Student access required.")
+
     result = functions.renew_loan(loan_id)
     
     if "error" in result:
@@ -63,7 +85,13 @@ def renew_loan(loan_id: int):
     return result
 
 @app.patch("/books/copies/{book_id}")
-def change_book_copies(book_id: int, new_total_copies: int):
+def change_book_copies(book_id: int, new_total_copies: int, token=Header(None)):
+    payload = functions.verify_token(token=token, token_type="access")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    if payload.get("user_type") != "librarian":
+        raise HTTPException(status_code=403, detail="Librarian access required.")
+
     if new_total_copies < 1 or new_total_copies > 20:
         raise HTTPException(status_code=422, detail="total copies must be between 1 and 20")
 
@@ -75,7 +103,13 @@ def change_book_copies(book_id: int, new_total_copies: int):
     return result
 
 @app.delete("/books/{book_id}")
-def remove_book(book_id: int):
+def remove_book(book_id: int, token=Header(None)):
+    payload = functions.verify_token(token=token, token_type="access")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    if payload.get("user_type") != "librarian":
+        raise HTTPException(status_code=403, detail="Librarian access required.")
+
     result = functions.delete_book(book_id)
 
     if "error" in result:
@@ -84,7 +118,13 @@ def remove_book(book_id: int):
     return result
 
 @app.post("/books/borrow/{book_id}")
-def borrow_book(book_id: int, roll_no: str):
+def borrow_book(book_id: int, roll_no: str, token=Header(None)):
+    payload = functions.verify_token(token=token, token_type="access")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    if payload.get("user_type") != "student":
+        raise HTTPException(status_code=403, detail="Student access required.")
+
     if roll_no.strip() == "":
         raise HTTPException(status_code=422, detail="roll no cannot be empty")
 
@@ -96,7 +136,13 @@ def borrow_book(book_id: int, roll_no: str):
     return result
   
 @app.patch("/loans/{loan_id}/return")
-def return_loan(loan_id: int):
+def return_loan(loan_id: int, token=Header(None)):
+    payload = functions.verify_token(token=token, token_type="access")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    if payload.get("user_type") != "student":
+        raise HTTPException(status_code=403, detail="Student access required.")
+
     result = functions.return_loan(loan_id)
     
     if "error" in result:
